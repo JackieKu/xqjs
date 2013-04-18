@@ -11,5 +11,3 @@ Number.prototype.__iterator__ = function numit(){
   if(this < 0) for(var i = -this; --i >= 0;) yield i;
   else for(i = -1; ++i < this;) yield i;
 };
-
-XML.setSettings({ignoreComments: false, ignoreProcessingInstructions: false});

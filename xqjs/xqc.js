@@ -33,7 +33,6 @@ function node(ls, doc){
   if(ls instanceof Node) return ls
   switch(type(ls)){
     case 'Array': break; // ['name', {attr}, ...children]
-    case 'XML': return node4x(ls, doc)
     default: return doc.createTextNode(ls)
   }
   if(typeof ls[0] != 'string'){
@@ -46,35 +45,6 @@ function node(ls, doc){
     for each(let [k, v] in Iterator(ls.shift())) lm.setAttribute(k, v)
   for each(let l in ls) lm.appendChild(node(l, doc))
   return lm
-}
-function node4x(xml, doc){
-  if(xml.length() === 1) switch(xml.nodeKind()){
-    case 'attribute': let at = true
-    case 'element':
-    let {uri, localName: name} = xml.name()
-    if(at){
-      at = uri ? doc.createAttributeNS(uri, name) : doc.createAttribute(name)
-      at.nodeValue = xml
-      return at
-    }
-    let lm = uri ? doc.createElementNS(uri, name) : doc.createElement(name)
-    for each(let a in xml.@*::*){
-      let {uri, localName: name} = a.name()
-      uri ? lm.setAttributeNS(uri, name, a) : lm.setAttribute(name, a)
-    }
-    lm.appendChild(node4x(xml.*::*, doc))
-    return lm
-    case 'text': return doc.createTextNode(xml)
-    case 'comment': return doc.createComment(xml.toString().slice(4, -3))
-    case 'processing-instruction':
-    let [, target, data] = /^<\?(\S+) ?([^]*)\?>$/(xml)
-    return doc.createProcessingInstruction(target, data)
-  }
-  if(0 in xml && xml[0].nodeKind() == 'attribute')
-    return [node4x(x, doc) for each(x in xml)]
-  var df = doc.createDocumentFragment()
-  for each(let x in xml) df.appendChild(node4x(x, doc))
-  return df
 }
 function empty(lm){
   while(lm.hasChildNodes()) lm.removeChild(lm.lastChild)
@@ -262,39 +232,3 @@ function sourl(type, code)
 function insert(editor, s)
 ( editor.QueryInterface(Ci.nsIPlaintextEditor).insertText(s)
 , editor )
-
-function zen(code){
-  var name = /(?:([\w$]*)\|)?([A-Za-z_][-.\w]*)/
-    , ident = /-?(?![\d-])[-\w\xA1-\uFFFF]+/, char = /^[^]/, digits = /\d+/
-    , kv = /([A-Za-z_][-.\w]*)(?:=([^\]]*))?\]?/, content = /{([^\}]*)}?/
-    , zs = code.trim().split(/\s{0,}([>+])\s{0,}/)
-    , root = <_/>, curs = [root], sep
-  for(let i = -1, l = zs.length; ++i < l; sep = zs[++i]){
-    if(!name.test(zs[i])) continue
-    let ns = RegExp.$1, lm = <{RegExp.$2}/>, n = 1
-    if(ns) lm.setNamespace(NS[ns] || NS[ns[0]])
-    for(let _, m; char.test(_ = RegExp.rightContext);) switch(_[0]){
-      case '#': lm.@id = ident(_) || ''
-      break
-      case '.': lm.@class += ('@class' in lm ? ' ' : '') + (ident(_) || '')
-      break
-      case '[': if((m = kv(_))) lm['@'+ m[1]] = m[2] || ''
-      break
-      case '{': if((m = content(_))) lm.appendChild(m[1])
-      break
-      case '*': n *= +digits(_) || 1
-    }
-    let _curs = [], p = sep === '+'
-      , sl = n > 1 && ~code.indexOf('$') && lm.toXMLString()
-    for each(let cur in curs){
-      if(p) cur = cur.parent() || cur
-      for(let i = 1; i <= n; ++i){
-        let clm = sl ? XML(sl.replace(/\$/g, i)) : lm.copy()
-        cur.appendChild(clm)
-        _curs.push(clm)
-      }
-    }
-    curs = _curs
-  }
-  return root.*
-}
